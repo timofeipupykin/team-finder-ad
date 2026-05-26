@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import JsonResponse
@@ -8,14 +10,18 @@ from .forms import ProjectForm
 from .models import Project
 
 
+def paginate_queryset(request, queryset, per_page=12):
+    paginator = Paginator(queryset, per_page)
+    return paginator.get_page(request.GET.get("page"))
+
+
 def project_list(request):
     projects = (
         Project.objects.select_related("owner")
         .prefetch_related("participants")
         .order_by("-created_at")
     )
-    paginator = Paginator(projects, 12)
-    page_obj = paginator.get_page(request.GET.get("page"))
+    page_obj = paginate_queryset(request, projects, per_page=12)
     query_prefix = ""
 
     return render(
@@ -46,7 +52,7 @@ def create_project(request):
             project.owner = request.user
             project.save()
             project.participants.add(request.user)
-            return redirect(f"/projects/{project.id}")
+            return redirect("projects:details", project_id=project.id)
     else:
         form = ProjectForm()
     return render(request, "projects/create-project.html", {"form": form, "is_edit": False})
@@ -56,13 +62,13 @@ def create_project(request):
 def edit_project(request, project_id):
     project = get_object_or_404(Project, pk=project_id)
     if project.owner_id != request.user.id:
-        return redirect(f"/projects/{project.id}")
+        return redirect("projects:details", project_id=project.id)
 
     if request.method == "POST":
         form = ProjectForm(request.POST, instance=project)
         if form.is_valid():
             form.save()
-            return redirect(f"/projects/{project.id}")
+            return redirect("projects:details", project_id=project.id)
     else:
         form = ProjectForm(instance=project)
     return render(request, "projects/create-project.html", {"form": form, "is_edit": True})
@@ -78,35 +84,51 @@ def favorite_projects(request):
 @require_POST
 @login_required
 def toggle_favorite(request, project_id):
-    project = get_object_or_404(Project, pk=project_id)
-    if request.user.favorites.filter(pk=project.id).exists():
+    project = Project.objects.filter(pk=project_id).first()
+    if project is None:
+        return JsonResponse(
+            {"status": "error", "detail": "Project not found"},
+            status=HTTPStatus.NOT_FOUND,
+        )
+
+    is_favorited = request.user.favorites.filter(pk=project.id).exists()
+    if is_favorited:
         request.user.favorites.remove(project)
-        favorited = False
     else:
         request.user.favorites.add(project)
-        favorited = True
-    return JsonResponse({"status": "ok", "favorited": favorited})
+    return JsonResponse({"status": "ok", "favorited": not is_favorited})
 
 
 @require_POST
 @login_required
 def complete_project(request, project_id):
-    project = get_object_or_404(Project, pk=project_id)
+    project = Project.objects.filter(pk=project_id).first()
+    if project is None:
+        return JsonResponse(
+            {"status": "error", "detail": "Project not found"},
+            status=HTTPStatus.NOT_FOUND,
+        )
+
     if project.owner_id == request.user.id and project.status == Project.STATUS_OPEN:
         project.status = Project.STATUS_CLOSED
         project.save(update_fields=["status"])
         return JsonResponse({"status": "ok", "project_status": "closed"})
-    return JsonResponse({"status": "error"}, status=403)
+    return JsonResponse({"status": "error"}, status=HTTPStatus.FORBIDDEN)
 
 
 @require_POST
 @login_required
 def toggle_participate(request, project_id):
-    project = get_object_or_404(Project, pk=project_id)
-    if project.participants.filter(pk=request.user.id).exists():
+    project = Project.objects.filter(pk=project_id).first()
+    if project is None:
+        return JsonResponse(
+            {"status": "error", "detail": "Project not found"},
+            status=HTTPStatus.NOT_FOUND,
+        )
+
+    is_participant = project.participants.filter(pk=request.user.id).exists()
+    if is_participant:
         project.participants.remove(request.user)
-        participant = False
     else:
         project.participants.add(request.user)
-        participant = True
-    return JsonResponse({"status": "ok", "participant": participant})
+    return JsonResponse({"status": "ok", "participant": not is_participant})

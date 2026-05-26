@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django.test import TestCase
 
 from .models import User
@@ -14,12 +16,12 @@ class UserFlowTests(TestCase):
                 "password": "StrongPass123",
             },
         )
-        self.assertEqual(register_response.status_code, 302)
+        self.assertEqual(register_response.status_code, HTTPStatus.FOUND)
         self.assertTrue(User.objects.filter(email="ivan@example.com").exists())
 
         login_response = self.client.post(
             "/users/login/",
             {"email": "ivan@example.com", "password": "StrongPass123"},
         )
-        self.assertEqual(login_response.status_code, 302)
+        self.assertEqual(login_response.status_code, HTTPStatus.FOUND)
         self.assertEqual(login_response.url, "/projects/list")
