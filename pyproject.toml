@@ -1,0 +1,19 @@
+[tool.black]
+line-length = 100
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | media
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".venv", "media"]
+
+[tool.ruff]
+line-length = 100
+exclude = [".venv", "media"]
+

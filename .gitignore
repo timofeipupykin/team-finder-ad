@@ -1,4 +1,6 @@
 /team_finder/media/
+/media/
+/media/avatars/avatar_*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -144,5 +146,14 @@ dmypy.json
 
 # Ruff stuff:
 .ruff_cache/
+.tmp/
+tmp/
 
 *.Identifier
+
+# OS/editor leftovers
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
